@@ -7,6 +7,10 @@ source_path = os.path.join('TIMIT', 'TEST')
 # sample rate of TIMIT is 16khz
 sample_rate = 16000
 
+# total of 51368 non-silence phonemes in TIMIT testing dataset
+total_phn = 51368
+curr_phn = 1
+
 # collapse 61 phn to 39 phn 
 # http://cdn.intechopen.com/pdfs/15948/InTech-Phoneme_recognition_on_the_timit_database.pdf
 def collapse_phn(char):
@@ -19,12 +23,12 @@ def collapse_phn(char):
 tfn = sox.Transformer()
 phn_count = {}
 
-for dirName, subdirList, fileList in os.walk(source_path):
-  for file in fileList:
+for dir_name, subdir_list, file_list in os.walk(source_path):
+  for file in file_list:
     if file.endswith('.PHN'):
       # load phoneme description
       lines = []
-      with open(dirName + '/' + file) as f:
+      with open(os.path.join(dir_name, file)) as f:
         [lines.append(line.rstrip().split(' ')) for line in f.readlines()]
 
       for line in lines:
@@ -34,12 +38,22 @@ for dirName, subdirList, fileList in os.walk(source_path):
         if(col_phone == 'h#'):
           continue
 
-        os.makedirs(os.path.join('phoneme_set', col_phone), exist_ok=True)
-
+        # record phoneme count
         if col_phone not in phn_count:
           phn_count[col_phone] = 1
         else:
           phn_count[col_phone] += 1
+
+        # cut section of audio that contains phoneme
+        os.makedirs(os.path.join('phoneme_set', col_phone), exist_ok=True)
+        tfn.trim(float(line[0]) / sample_rate, float(line[1]) / sample_rate)
+        tfn.build(os.path.join(dir_name, file[:-4] + '.wav'), os.path.join('phoneme_set', col_phone, col_phone + str(phn_count[col_phone]) + '.wav'))
+
+        print('Extracted phoneme {} out of {}'.format(curr_phn, total_phn), end='\r')
+        curr_phn += 1
+
+        # reset transformer
+        tfn.clear_effects()
 
 sorted_phn = sorted(phn_count.items(), key=operator.itemgetter(1), reverse=True)
 with open('phn_occurence.txt', 'w+') as f:
