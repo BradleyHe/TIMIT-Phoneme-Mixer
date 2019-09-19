@@ -1,3 +1,5 @@
 timit/
 TIMIT/
 phoneme_set/
+__pycache__/
+*.wav
