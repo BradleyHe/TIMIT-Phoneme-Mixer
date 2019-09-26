@@ -23,6 +23,7 @@ def collapse_phn(char):
 tfn = sox.Transformer()
 phn_count = {}
 
+# extracts all instances of non-silence phonemes
 for dir_name, subdir_list, file_list in os.walk(source_path):
   for file in file_list:
     if file.endswith('.PHN'):
@@ -47,6 +48,7 @@ for dir_name, subdir_list, file_list in os.walk(source_path):
         # cut section of audio that contains phoneme
         os.makedirs(os.path.join('phoneme_set', col_phone), exist_ok=True)
         tfn.trim(float(line[0]) / sample_rate, float(line[1]) / sample_rate)
+        tfn.pad(0.1)
         tfn.build(os.path.join(dir_name, file[:-4] + '.wav'), os.path.join('phoneme_set', col_phone, col_phone + str(phn_count[col_phone]) + '.wav'))
 
         print('Extracted phoneme {} out of {}'.format(curr_phn, total_phn), end='\r')
@@ -55,8 +57,9 @@ for dir_name, subdir_list, file_list in os.walk(source_path):
         # reset transformer
         tfn.clear_effects()
 
+
 sorted_phn = sorted(phn_count.items(), key=operator.itemgetter(1), reverse=True)
-with open('phn_occurence.txt', 'w+') as f:
+with open('config/phn_occurence.txt', 'w+') as f:
   [f.write(phn[0] + ' ' + str(phn[1]) + '\n') for phn in sorted_phn]
 
 
