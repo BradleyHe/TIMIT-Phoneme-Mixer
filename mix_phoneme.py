@@ -6,6 +6,7 @@ import random
 import operator
 import itertools
 import numpy as np
+import pandas as pd
 
 # if this is removed, pytorch will output harmless warning messages that may be irritating
 import warnings
@@ -42,14 +43,14 @@ def mix_phonemes(phn1, phn2):
   rms2 = sox.file_info.stat(file2)['RMS     amplitude']
   factor = tir_factor(0, rms1, rms2)
 
-
   cbn = sox.Combiner()
   cbn.set_input_format(file_type=['wav', 'wav'])
-  cbn.build([file1, file2], 'new.wav', 'mix', [1, 1 / factor])
+  cbn.build([file1, file2], 'test/new.wav', 'mix', [1, 1 / factor])
 
   tfn = sox.Transformer()
-  pred = test_mixed('new.wav')
-  print(pred)
+  pred = test_mixed('test/new.wav')
+  os.remove('test/new.wav')
+  return pred
 
 def test_mixed(path):
   data_type = 'float32'
@@ -68,22 +69,47 @@ def test_mixed(path):
     pred,true = test_file(batch_data, batch_label, listener, speller, optimizer, **conf['model_parameter'])
     return pred
 
+# test all combinations of phonemes
 def test_all():
-  mix_count = 500 
-  phonemes = ['ah', 's', 'er', 'ih', 't', 'ow', 'ey', 'ay', 'aa', 'eh']
+  occurence = {}
+  mix_count = 5
 
+  all_phonemes = os.listdir('phoneme_set')
+
+  # only phonemes (besides d) that were recognized by LAS more than 200 times are included here
+  test_phonemes = ['ah', 's', 'er', 'ih', 't', 'ow', 'ey', 'ay', 'aa', 'eh']
+ 
   ''' Many vowel phonemes phonemes listed here are interpreted by the LAS model as having a 'd' phoneme before it.
-      For example, an evaluation of an 'ah' sound file would return as "#h d ah #h".
+      For example, an evaluation of an 'ah' sound file would return as "h# d ah h#".
       We hypothesise that this might occur since the LAS model is not trained to recognize singular phonemes like this, 
       so it gives a more "word based" guess by inserting a constanant before it. However we cannot confirm this.
       Regardless, this leader phoneme must be removed after evaluation in order to provide insightful results
       This is the reason why the 'd' phoneme is not included in the phoneme mixing procedure, as it would be 
       impossible to tell if the LAS model is predicting a 'd' or is placing a 'd' before a vowel.
   '''
-  mix_phn_list = list(itertools.combinations_with_replacement(phonemes, 2))
+  remove_phonemes = ['h#', 'd']
+
+  mix_phn_list = list(itertools.combinations_with_replacement(test_phonemes, 2))
+
+  # create data dictionary
+  for phns in mix_phn_list:
+    occurence['{}_{}'.format(phns[0], phns[1])] = {}
+    for phn in all_phonemes:
+      occurence['{}_{}'.format(phns[0], phns[1])][phn] = 0
 
   for phns in mix_phn_list:
-    mix_phonemes(phns[0], phns[1])
+    for x in range(mix_count):
+      print('Mixing {} and {} #{}'.format(phns[0], phns[1], x+1), end='\r')
+      pred = mix_phonemes(phns[0], phns[1])
+      pred = [phn for phn in pred if phn not in remove_phonemes]
+      pred = list(set(pred))
+
+      for phn in pred:
+        occurence['{}_{}'.format(phns[0], phns[1])][phn] += 1
+    print()
+
+  df = pd.DataFrame.from_dict(occurence, orient='index')
+  df.to_csv('data.csv')
 
 # load LAS model
 config_path = 'config/las_example_config.yaml'

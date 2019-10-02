@@ -4,3 +4,4 @@ phoneme_set/
 strat_phoneme_set/
 __pycache__/
 *.wav
+*.csv
