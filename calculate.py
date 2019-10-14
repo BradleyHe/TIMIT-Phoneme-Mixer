@@ -191,4 +191,4 @@ def average_phn_size():
 #average_data()
 #mixed_acc()
 #graph_scatter()
-average_phn_length()
+average_phn_size()
