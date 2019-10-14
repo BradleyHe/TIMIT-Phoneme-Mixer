@@ -15,12 +15,12 @@ from six.moves import cPickle
 import warnings
 warnings.filterwarnings("ignore")
 
-phn_occurence = {}
+phn_occurrence = {}
 
 # load phoneme information
-with open('config/phn_occurence.txt') as f:
+with open('config/phn_occurrence.txt') as f:
   for line in f.readlines():
-    phn_occurence[line.split()[0]] = int(line.split()[1])
+    phn_occurrence[line.split()[0]] = int(line.split()[1])
 
 phonemes = ['ih', 'n', 'iy', 'l', 's', 'r', 'ah', 'aa', 'er', 'k', 'm', 't', 'eh', 'ae', 'z', 'd', 'q', 'w', 'dh', 'p', 
 						'dx', 'f', 'b', 'sh', 'ay', 'ey', 'ow', 'g', 'uw', 'hh', 'v', 'y', 'ng', 'jh', 'th', 'oy', 'ch', 'uh', 'aw']
@@ -54,7 +54,7 @@ optimizer = torch.optim.Adam([{'params':listener.parameters()}, {'params':spelle
 for phn in phonemes:
 	i = 0
 	for file in os.listdir(os.path.join('phoneme_set', phn)):
-		print('Testing {} {} out of {}'.format(phn, str(i), str(phn_occurence[phn])), end='\r')
+		print('Testing {} {} out of {}'.format(phn, str(i), str(phn_occurrence[phn])), end='\r')
 		test = os.path.join('phoneme_set', phn, file)
 		pred = get_pred(test)
 
@@ -71,6 +71,6 @@ for phn in phonemes:
 
 
 sorted_phn = sorted(strat_phn_count.items(), key=operator.itemgetter(1), reverse=True)
-with open('config/strat_phn_occurence.txt', 'w+') as f:
+with open('config/strat_phn_occurrence.txt', 'w+') as f:
   [f.write(phn[0] + ' ' + str(phn[1]) + '\n') for phn in sorted_phn]
 

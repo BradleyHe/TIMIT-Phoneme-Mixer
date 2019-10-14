@@ -23,21 +23,22 @@ def calculate_tir(target, interference):
 def tir_factor(ratio, target, interference):
   return 10 ** ((ratio - calculate_tir(target, interference)) / 20)
 
-phn_occurence = {}
-
+phn_occurrence = {}
+#test_set = 'strat_phoneme_set'
+test_set = 'phoneme_set'
 
 # load phoneme information
-with open('config/strat_phn_occurence.txt') as f:
+with open('config/strat_phn_occurrence.txt') as f:
   for line in f.readlines():
-    phn_occurence[line.split()[0]] = int(line.split()[1])
+    phn_occurrence[line.split()[0]] = int(line.split()[1])
 
 # chooses two random phonemes defined by arguments and mixes them
 def mix_phonemes(phn1, phn2):
-  phn1_list = [os.path.join('strat_phoneme_set', phn1, file) for file in os.listdir('strat_phoneme_set/' + phn1)]
-  phn2_list = [os.path.join('strat_phoneme_set', phn2, file) for file in os.listdir('strat_phoneme_set/' + phn2)]
+  phn1_list = [os.path.join(test_set, phn1, file) for file in os.listdir(os.path.join(test_set, phn1))]
+  phn2_list = [os.path.join(test_set, phn2, file) for file in os.listdir(os.path.join(test_set, phn2))]
 
-  file1 = phn1_list[random.randint(0, phn_occurence[phn1] - 1)]
-  file2 = phn2_list[random.randint(0, phn_occurence[phn2] - 1)]
+  file1 = phn1_list[random.randint(0, phn_occurrence[phn1] - 1)]
+  file2 = phn2_list[random.randint(0, phn_occurrence[phn2] - 1)]
 
   rms1 = sox.file_info.stat(file1)['RMS     amplitude']
   rms2 = sox.file_info.stat(file2)['RMS     amplitude']
@@ -47,7 +48,6 @@ def mix_phonemes(phn1, phn2):
   cbn.set_input_format(file_type=['wav', 'wav'])
   cbn.build([file1, file2], 'test/new.wav', 'mix', [1, 1 / factor])
 
-  tfn = sox.Transformer()
   pred = test_mixed('test/new.wav')
   os.remove('test/new.wav')
   return pred
@@ -71,8 +71,11 @@ def test_mixed(path):
 
 # test all combinations of phonemes
 def test_all():
-  occurence = {}
-  mix_count = 5
+  occurrence = {}
+  output_len = {}
+  not_present = {}
+  mix_count = 1000
+  folder_name = 'original2'
 
   all_phonemes = os.listdir('phoneme_set')
 
@@ -91,25 +94,46 @@ def test_all():
 
   mix_phn_list = list(itertools.combinations_with_replacement(test_phonemes, 2))
 
-  # create data dictionary
+  # create data dictionaries
   for phns in mix_phn_list:
-    occurence['{}_{}'.format(phns[0], phns[1])] = {}
+    occurrence['{}_{}'.format(phns[0], phns[1])] = {}
+    output_len['{}_{}'.format(phns[0], phns[1])] = 0
+    not_present['{}_{}'.format(phns[0], phns[1])] = 0
     for phn in all_phonemes:
-      occurence['{}_{}'.format(phns[0], phns[1])][phn] = 0
+      occurrence['{}_{}'.format(phns[0], phns[1])][phn] = 0
 
   for phns in mix_phn_list:
+    total_length = 0
     for x in range(mix_count):
-      print('Mixing {} and {} #{}'.format(phns[0], phns[1], x+1), end='\r')
+      print('Mixing {} and {} #{}'.format(phns[0], phns[1], x + 1), end='\r')
       pred = mix_phonemes(phns[0], phns[1])
       pred = [phn for phn in pred if phn not in remove_phonemes]
-      pred = list(set(pred))
+      pred = list(set(pred)) #remove duplicates
 
+      # count occurrence of phns
       for phn in pred:
-        occurence['{}_{}'.format(phns[0], phns[1])][phn] += 1
-    print()
+        occurrence['{}_{}'.format(phns[0], phns[1])][phn] += 1
 
-  df = pd.DataFrame.from_dict(occurence, orient='index')
-  df.to_csv('data.csv')
+      # count num of outputs that did not have original phonemes in them 
+      if phns[0] not in pred and phns[1] not in pred:
+        not_present['{}_{}'.format(phns[0], phns[1])] += 1
+
+      total_length += len(pred)
+
+    output_len['{}_{}'.format(phns[0], phns[1])] = total_length / mix_count
+    print('average output length: {}'.format(total_length / mix_count))
+
+    df = pd.DataFrame.from_dict(occurrence, orient='index')
+    df.to_csv('data/' + folder_name + '/' + folder_name + '.csv')
+
+  with open('data/' + folder_name + '/output_len.txt', 'w+') as f:
+    [f.write(phns + ': ' + str(length) + '\n') for phns,length in output_len.items()]
+
+  with open('data/' + folder_name + '/not_present.txt', 'w+') as f:
+    [f.write(phns + ': ' + str(num) + '\n') for phns,num in not_present.items()]
+
+  df = pd.DataFrame.from_dict(occurrence, orient='index')
+  df.to_csv('data/' + folder_name + '/' + folder_name + '.csv')
 
 # load LAS model
 config_path = 'config/las_example_config.yaml'
@@ -118,6 +142,5 @@ conf = yaml.load(open(config_path,'r'))
 listener = torch.load(conf['training_parameter']['pretrained_listener_path'], map_location=lambda storage, loc: storage)
 speller = torch.load(conf['training_parameter']['pretrained_speller_path'], map_location=lambda storage, loc: storage)
 optimizer = torch.optim.Adam([{'params':listener.parameters()}, {'params':speller.parameters()}], lr=conf['training_parameter']['learning_rate'])
-
-# mix_phonemes('ow', 't') 
+os.makedirs('data', exist_ok=True)
 test_all()
